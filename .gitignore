@@ -1,0 +1,10 @@
+*.pyc
+data/
+__pycache__/
+checkpoints/
+checkpoints+tversky_loss/
+*.pth
+*.jpg
+venv/
+.idea/
+wandb/
