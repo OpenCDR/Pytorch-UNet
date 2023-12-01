@@ -166,12 +166,6 @@ def train_model(
                             multiclass=True
                         )
 
-                # optimizer.zero_grad(set_to_none=True)
-                # grad_scaler.scale(loss).backward()
-                # torch.nn.utils.clip_grad_norm_(
-                #     model.parameters(), gradient_clipping)
-                # grad_scaler.step(optimizer)
-                # grad_scaler.update()
                 optimizer.zero_grad()
                 with amp.scale_loss(loss, optimizer) as scaled_loss:
                     scaled_loss.backward()
@@ -191,35 +185,22 @@ def train_model(
                 division_step = (n_train // (5 * batch_size))
                 if division_step > 0:
                     if global_step % division_step == 0:
-                        histograms = {}
-                        # for tag, value in model.named_parameters():
-                        # tag = tag.replace('/', '.')
-                        # if not (torch.isinf(value) | torch.isnan(value)).any():
-                        # histograms['Weights/' +
-                        #    tag] = wandb.Histogram(value.data.cpu())
-                        # if not (torch.isinf(value.grad) | torch.isnan(value.grad)).any():
-                        # histograms['Gradients/' +
-                        #    tag] = wandb.Histogram(value.grad.data.cpu())
-
-                        val_score, miou, acc, kappa = evaluate(
+                        val_score = evaluate(
                             model, val_loader, device, amp_)
-                        # scheduler.step()
 
                         logging.info(
                             'Validation Dice score: {}'.format(val_score))
-
                         try:
                             experiment.log({
                                 'learning rate': optimizer.param_groups[0]['lr'],
                                 'validation Dice': val_score,
                                 'images': wandb.Image(images[0].cpu()),
                                 'masks': {
-                                    'true': wandb.Image(true_masks[0].float().cpu()*255),
-                                    'pred': wandb.Image(masks_pred.argmax(dim=1)[0].float().cpu()*255),
+                                    'true': wandb.Image(true_masks[0].float().cpu() * 255),
+                                    'pred': wandb.Image(masks_pred.argmax(dim=1)[0].float().cpu() * 255),
                                 },
                                 'step': global_step,
-                                'epoch': epoch,
-                                **histograms
+                                'epoch': epoch
                             })
                         except:
                             pass
@@ -233,11 +214,8 @@ def train_model(
             if val_score > best_val_score:
                 best_val_score = val_score
                 torch.save(state_dict, str(dir_checkpoint /
-                           'best_core_{:.05}.pth'.format(best_val_score)))
+                                           'best_core_{:.05}.pth'.format(best_val_score)))
                 logging.info(f'Checkpoint {epoch} saved!')
-            # torch.save(state_dict, str(dir_checkpoint /
-                #    'checkpoint_epoch{}.pth'.format(epoch)))
-            # logging.info(f'Checkpoint {epoch} saved!')
 
         stopper(epoch=epoch, fitness=val_score)
         if stopper.possible_stop:
@@ -314,7 +292,6 @@ if __name__ == '__main__':
         logging.info(f'Model loaded from {args.load}')
 
     model.to(device=device)
-    # try:
     train_model(
         model=model,
         hyp=args.hyp,
@@ -329,21 +306,3 @@ if __name__ == '__main__':
         patience=args.patience,
         data_augment=args.data_augment
     )
-    # except torch.cuda.OutOfMemoryError:
-    #     logging.error('Detected OutOfMemoryError! '
-    #                   'Enabling checkpointing to reduce memory usage, but this slows down training. '
-    #                   'Consider enabling AMP (--amp) for fast and memory efficient training')
-    #     torch.cuda.empty_cache()
-    #     model.use_checkpointing()
-    #     train_model(
-    #         model=model,
-    #         epochs=args.epochs,
-    #         batch_size=args.batch_size,
-    #         learning_rate=args.lr,
-    #         device=device,
-    #         img_size=args.img_size,
-    #         val_percent=args.val / 100,
-    #         amp=args.amp
-    #         mask_suffix=args.mask_suffix,
-    #         patience=args.patience
-    #     )
